@@ -1,10 +1,12 @@
 # 🩺 EndoPredict AI: Multilayer Perceptron for Diabetes Prediction
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://streamlit.io)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://endopredict-ai.streamlit.app/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-F7931E.svg)](https://scikit-learn.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+> **🌐 Live Deployment**: Access the production research dashboard at **[https://endopredict-ai.streamlit.app/](https://endopredict-ai.streamlit.app/)**
+> 
 > **Academic Multilayer Perceptron (MLP) Binary Classification System** for diabetes prediction using domain feature engineering, median zero-value imputation, and multi-model benchmarking.
 
 ---

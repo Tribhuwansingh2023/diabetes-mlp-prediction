@@ -629,7 +629,7 @@ def generate_docx():
     add_body("Additional exploratory data analysis charts, correlation matrices, and hyperparameter tuning logs are archived in results/ and visualizations/ directories.")
 
     add_h1("C Deployment Screenshots")
-    add_body("The deployed Streamlit dashboard provides single patient triage, biometric radar charts, What-If simulation, and batch cohort screening at localhost:8501 and Streamlit Community Cloud.")
+    add_body("The deployed Streamlit dashboard provides single patient triage, biometric radar charts, What-If simulation, and batch cohort screening. Live Web Application: https://endopredict-ai.streamlit.app/ (Local Dev: http://localhost:8501).")
 
     add_h1("D Contributions of Group Members")
 
@@ -1069,7 +1069,7 @@ def generate_pdf():
     story.append(Paragraph("Provide content here.<br/>Archived in results/ and visualizations/ directories.", body_style))
 
     story.append(Paragraph("C Deployment Screenshots", h1_style))
-    story.append(Paragraph("Provide content here.<br/>Streamlit dashboard active at localhost:8501 and configured for Streamlit Cloud hosting.", body_style))
+    story.append(Paragraph("Provide content here.<br/>Streamlit dashboard active at <b>https://endopredict-ai.streamlit.app/</b> (Local Dev: http://localhost:8501).", body_style))
 
     story.append(Paragraph("D Contributions of Group Members", h1_style))
     contrib_data = [
