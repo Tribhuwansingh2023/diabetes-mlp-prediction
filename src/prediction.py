@@ -122,12 +122,20 @@ def predict_patient(patient_data, threshold=0.50):
     probabilities = model.predict_proba(df_processed)[:, 1]
     prob = float(probabilities[0])
     pred = int(prob >= threshold)
+    confidence = float(prob if pred == 1 else (1.0 - prob))
+    
+    # Extract engineered feature values and processed features dict
+    proc_dict = df_processed.iloc[0].to_dict()
+    eng_dict = {k: proc_dict[k] for k in ENGINEERED_FEATURE_NAMES if k in proc_dict}
     
     return {
         'predicted_class': pred,
         'probability': prob,
+        'confidence': confidence,
+        'class_name': 'Diabetic' if pred == 1 else 'Non-Diabetic',
         'raw_input': df_raw,
-        'processed_features': df_processed,
+        'processed_features': proc_dict,
+        'engineered_features': eng_dict,
         'processed_feature_names': list(df_processed.columns),
         'raw_feature_count': int(df_raw.shape[1]),
         'processed_feature_count': int(df_processed.shape[1]),

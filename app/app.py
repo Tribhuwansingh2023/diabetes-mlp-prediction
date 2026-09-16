@@ -566,13 +566,19 @@ def render_prediction_tab(model, preprocessor, config: dict, preset: dict, thres
         st.plotly_chart(render_biometric_radar(patient_dict), use_container_width=True)
 
     # Input Quality Assessment
-    is_valid, validation_warnings = validate_patient_input(patient_dict)
+    validation_warnings = []
+    zero_fields = [k for k in ["Glucose", "BloodPressure", "SkinThickness", "Insulin", "BMI"] if patient_dict[k] == 0]
+    if zero_fields:
+        for f in zero_fields:
+            validation_warnings.append(f"{f} is entered as 0 (biologically implausible; train-fitted median imputation will be applied).")
+    if age < 15 or age > 100:
+        validation_warnings.append(f"Age {age} is outside typical adult screening range (15-100).")
     
     if validation_warnings:
-        with st.expander("⚠️ Input Quality Check & Biological Flags", expanded=True):
+        with st.expander("⚠️ Input Quality Check & Biological Imputation Flags", expanded=True):
             for w in validation_warnings:
                 st.warning(f"• {w}")
-            st.caption("Note: Biologically implausible zero values in continuous physiological variables will be handled using the train-fitted median imputer.")
+            st.caption("Note: The single-source inference pipeline automatically applies training-fitted median imputation for continuous zero values.")
     else:
         st.success("✓ **Input Quality Check**: All input values are biologically plausible and within expected clinical ranges.")
 
@@ -1080,9 +1086,16 @@ def render_diagnostics_tab():
     config_path = os.path.join(BASE_DIR, "saved_models", "model_config.json")
     
     # Latency test
-    sample_pt = {k: 50.0 for k in RAW_FEATURE_NAMES}
-    sample_pt["Pregnancies"] = 1
-    sample_pt["Age"] = 30
+    sample_pt = {
+        "Pregnancies": 2,
+        "Glucose": 120.0,
+        "BloodPressure": 75.0,
+        "SkinThickness": 25.0,
+        "Insulin": 85.0,
+        "BMI": 28.0,
+        "DiabetesPedigreeFunction": 0.45,
+        "Age": 32
+    }
     
     t0 = time.perf_counter()
     smoke_res = predict_patient(sample_pt)
