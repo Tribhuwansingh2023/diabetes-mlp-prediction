@@ -614,9 +614,9 @@ def render_prediction_tab(model, preprocessor, config: dict, preset: dict, thres
                 return
 
         res = st.session_state.last_prediction
-        prob = res["probability"]
-        pred_class = res["predicted_class"]
-        conf = res["confidence"]
+        prob = float(res.get("probability", 0.0))
+        pred_class = int(res.get("predicted_class", int(prob >= threshold)))
+        conf = float(res.get("confidence", prob if pred_class == 1 else (1.0 - prob)))
         
         st.markdown("---")
         st.markdown("### 🎯 Model Prediction Assessment")
@@ -831,14 +831,17 @@ def render_batch_tab(model, preprocessor, config: dict, threshold: float):
             for idx, row in batch_df.iterrows():
                 p_dict = {col: float(row[col]) for col in RAW_FEATURE_NAMES}
                 res = predict_patient(p_dict, threshold=threshold)
+                p_prob = float(res.get("probability", 0.0))
+                p_pred = int(res.get("predicted_class", int(p_prob >= threshold)))
+                p_conf = float(res.get("confidence", p_prob if p_pred == 1 else (1.0 - p_prob)))
                 results_list.append({
                     "Patient_ID": f"PT-{idx+1:03d}",
                     **p_dict,
-                    "Probability": res["probability"],
-                    "Risk_Probability": f"{res['probability']:.1%}",
-                    "Prediction": "Diabetic" if res["predicted_class"] == 1 else "Non-Diabetic",
-                    "Confidence": f"{res['confidence']:.1%}",
-                    "Risk_Stratum": "High" if res["probability"] >= 0.65 else ("Moderate" if res["probability"] >= 0.40 else "Low")
+                    "Probability": p_prob,
+                    "Risk_Probability": f"{p_prob:.1%}",
+                    "Prediction": "Diabetic" if p_pred == 1 else "Non-Diabetic",
+                    "Confidence": f"{p_conf:.1%}",
+                    "Risk_Stratum": "High" if p_prob >= 0.65 else ("Moderate" if p_prob >= 0.40 else "Low")
                 })
             
             res_df = pd.DataFrame(results_list)
