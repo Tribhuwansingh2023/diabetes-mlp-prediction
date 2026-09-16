@@ -7,9 +7,13 @@
 
 ---
 
-## 2. Submitted By
-- **Student Name**: Tribhuvan Singh
-- **Registration Number**: [Enter Registration Number Here]
+## 2. Submitted By (Group Members)
+| Sl. No. | Student Name | Registration Number |
+| :---: | :--- | :---: |
+| 1 | **Tribhuwan Singh** | `2341019538` |
+| 2 | **Surajit Sahoo** | `2341019165` |
+| 3 | **Anwesha Srichandan** | `2341019594` |
+| 4 | **Priti Rani Maity** | `2341013065` |
 
 ---
 

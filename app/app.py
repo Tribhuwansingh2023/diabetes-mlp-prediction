@@ -701,8 +701,26 @@ def render_diagnostics_tab():
     st.markdown(render_html_table(pd.DataFrame(diag_rows)), unsafe_allow_html=True)
 
 def render_footer():
-    """Renders the academic and medical disclaimer footer."""
+    """Renders the academic and medical disclaimer footer with team credits."""
     st.markdown("---")
+    st.markdown("""
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 18px; margin-top: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+                <span style="font-weight: 600; color: #94a3b8; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em;">Project Contributors (Lab Group)</span>
+                <div style="color: #cbd5e1; font-size: 0.85rem; margin-top: 4px;">
+                    <strong>Tribhuwan Singh</strong> (2341019538) &nbsp;•&nbsp; 
+                    <strong>Surajit Sahoo</strong> (2341019165) &nbsp;•&nbsp; 
+                    <strong>Anwesha Srichandan</strong> (2341019594) &nbsp;•&nbsp; 
+                    <strong>Priti Rani Maity</strong> (2341013065)
+                </div>
+            </div>
+            <div style="font-size: 0.78rem; color: #64748b;">
+                Lab Assignment 01 • Deep Learning Laboratory
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.caption("ℹ️ **Academic & Medical Disclaimer**: This application is an academic machine-learning demonstration developed for Lab Assignment 01 (Predicting Diabetes with Multilayer Perceptron). It is not intended to provide standalone medical diagnosis, medical advice, or treatment plans.")
 
 def main():

@@ -105,7 +105,16 @@ python test_deployment.py
 2. Go to [share.streamlit.io](https://share.streamlit.io) and log in with GitHub.
 3. Click **"New app"**, select `Tribhuwansingh2023/diabetes-mlp-prediction`, set the main file path to `app/app.py`, and click **"Deploy"**!
 
+## 👥 Team Members & Contributors
+| Sl. No. | Name | Registration Number |
+| :---: | :--- | :---: |
+| 1 | **Tribhuwan Singh** | `2341019538` |
+| 2 | **Surajit Sahoo** | `2341019165` |
+| 3 | **Anwesha Srichandan** | `2341019594` |
+| 4 | **Priti Rani Maity** | `2341013065` |
+
 ---
 
 ## ℹ️ Academic & Medical Disclaimer
 This application was developed strictly for academic and educational evaluation as part of Lab Assignment 01. It is not certified for autonomous clinical diagnosis and must not replace professional medical evaluations.
+

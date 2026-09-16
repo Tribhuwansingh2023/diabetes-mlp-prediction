@@ -14,6 +14,14 @@ cells.append(nbf.v4.new_markdown_cell(r"""# Lab Assignment 01: Predicting Diabet
 **Course**: Deep Learning / Machine Learning Laboratory  
 **Problem Statement**: Develop an end-to-end binary classification system to predict patient diabetes onset using biometric and demographic attributes from the Pima Indians Diabetes Database. Benchmark conventional machine learning baselines against an optimized Multilayer Perceptron (MLP) implemented in Scikit-Learn.
 
+### 👥 Submitted By (Group Members):
+| Sl. No. | Student Name | Registration Number |
+| :---: | :--- | :---: |
+| 1 | **Tribhuwan Singh** | `2341019538` |
+| 2 | **Surajit Sahoo** | `2341019165` |
+| 3 | **Anwesha Srichandan** | `2341019594` |
+| 4 | **Priti Rani Maity** | `2341013065` |
+
 ---
 ## Notebook Structure
 1. **Environment Setup & Library Imports**
