@@ -835,7 +835,7 @@ class SOAReportCanvas(canvas.Canvas):
         if self._pageNumber > 1:
             self.setFont("Times-Roman", 10)
             self.setFillColor(colors.black)
-            self.drawString(54, 745, "Write title here")
+            self.drawString(54, 745, "Diabetes Onset Prediction using Multilayer Perceptron")
             self.drawRightString(612 - 54, 745, str(self._pageNumber - 1))
             self.setStrokeColor(colors.black)
             self.setLineWidth(0.5)
