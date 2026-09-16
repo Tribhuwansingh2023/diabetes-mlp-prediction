@@ -1,14 +1,13 @@
 """
 Evaluation and Visualization Module for Diabetes Prediction.
 Calculates comprehensive classification metrics, confusion matrices, ROC/PR curves,
-and generates presentation-ready visual artifacts.
+and training loss progression curves.
 """
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import torch
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, roc_curve, precision_recall_curve, confusion_matrix
@@ -17,41 +16,34 @@ from sklearn.metrics import (
 # Apply sleek styling
 plt.style.use('seaborn-v0_8-whitegrid' if 'seaborn-v0_8-whitegrid' in plt.style.available else 'default')
 plt.rcParams['font.sans-serif'] = 'DejaVu Sans'
-plt.rcParams['figure.dpi'] = 300
+plt.rcParams['figure.dpi'] = 100
 
-def evaluate_model(model, X_test, y_test, model_name="Model", is_pytorch=False):
+def evaluate_model(model, X_test, y_test, model_name="Model"):
     """
-    Evaluates binary classification model and returns metrics dictionary.
+    Evaluates a binary classification model and returns a metrics dictionary.
     """
-    if is_pytorch:
-        model.eval()
-        with torch.no_grad():
-            tensor_X = torch.tensor(X_test.values, dtype=torch.float32)
-            probabilities = model(tensor_X).squeeze().numpy()
-            predictions = (probabilities >= 0.5).astype(int)
+    predictions = model.predict(X_test)
+    if hasattr(model, "predict_proba"):
+        probabilities = model.predict_proba(X_test)[:, 1]
+    elif hasattr(model, "decision_function"):
+        decision = model.decision_function(X_test)
+        probabilities = 1.0 / (1.0 + np.exp(-decision))
     else:
-        predictions = model.predict(X_test)
-        if hasattr(model, "predict_proba"):
-            probabilities = model.predict_proba(X_test)[:, 1]
-        elif hasattr(model, "decision_function"):
-            probabilities = model.decision_function(X_test)
-            probabilities = 1 / (1 + np.exp(-probabilities))
-        else:
-            probabilities = predictions
+        probabilities = predictions.astype(float)
 
-    acc = accuracy_score(y_test, predictions)
-    prec = precision_score(y_test, predictions, zero_division=0)
-    rec = recall_score(y_test, predictions, zero_division=0)
-    f1 = f1_score(y_test, predictions, zero_division=0)
+    acc = float(accuracy_score(y_test, predictions))
+    prec = float(precision_score(y_test, predictions, zero_division=0))
+    rec = float(recall_score(y_test, predictions, zero_division=0))
+    f1 = float(f1_score(y_test, predictions, zero_division=0))
     
     try:
-        auc = roc_auc_score(y_test, probabilities)
+        auc = float(roc_auc_score(y_test, probabilities))
     except Exception:
-        auc = np.nan
+        auc = float('nan')
         
     cm = confusion_matrix(y_test, predictions)
     tn, fp, fn, tp = cm.ravel() if cm.shape == (2, 2) else (0, 0, 0, 0)
-    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    specificity = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
 
     return {
         'Model': model_name,
@@ -71,7 +63,7 @@ def evaluate_model(model, X_test, y_test, model_name="Model", is_pytorch=False):
     }
 
 def plot_confusion_matrices(results_dict, save_path):
-    """Plots grid of confusion matrices for multiple models."""
+    """Plots grid of confusion matrices for evaluated models."""
     n_models = len(results_dict)
     cols = min(3, n_models)
     rows = (n_models + cols - 1) // cols
@@ -83,13 +75,13 @@ def plot_confusion_matrices(results_dict, save_path):
         cm = res['cm']
         sns.heatmap(
             cm, annot=True, fmt='d', cmap='Blues', cbar=False, ax=axes[idx],
-            xticklabels=['Non-Diabetic (0)', 'Diabetic (1)'],
-            yticklabels=['Non-Diabetic (0)', 'Diabetic (1)'],
+            xticklabels=['Negative (0)', 'Positive (1)'],
+            yticklabels=['Negative (0)', 'Positive (1)'],
             annot_kws={'size': 13, 'weight': 'bold'}
         )
         axes[idx].set_title(f"{name}\nAcc: {res['Accuracy']:.3f} | Recall: {res['Recall (Sensitivity)']:.3f}", fontsize=11, fontweight='bold')
-        axes[idx].set_xlabel('Predicted Label', fontsize=10)
-        axes[idx].set_ylabel('True Label', fontsize=10)
+        axes[idx].set_xlabel('Predicted Class', fontsize=10)
+        axes[idx].set_ylabel('True Class', fontsize=10)
         
     for j in range(idx + 1, len(axes)):
         fig.delaxes(axes[j])
@@ -113,7 +105,7 @@ def plot_roc_curves(results_dict, y_test, save_path):
     plt.xlim([-0.02, 1.02])
     plt.ylim([-0.02, 1.05])
     plt.xlabel('False Positive Rate (1 - Specificity)', fontsize=12, fontweight='bold')
-    plt.ylabel('True Positive Rate (Recall / Sensitivity)', fontsize=12, fontweight='bold')
+    plt.ylabel('True Positive Rate (Sensitivity / Recall)', fontsize=12, fontweight='bold')
     plt.title('Receiver Operating Characteristic (ROC) Comparison', fontsize=14, fontweight='bold', pad=12)
     plt.legend(loc='lower right', frameon=True, fontsize=10)
     plt.tight_layout()
@@ -138,30 +130,21 @@ def plot_precision_recall_curves(results_dict, y_test, save_path):
     plt.savefig(save_path, bbox_inches='tight')
     plt.close()
 
-def plot_mlp_learning_curves(history, save_path):
-    """Plots training vs validation loss and accuracy curves across epochs."""
-    epochs = range(1, len(history['train_loss']) + 1)
+def plot_mlp_learning_curves(mlp_model, save_path):
+    """Plots the actual training loss progression curve from the fitted MLPClassifier."""
+    if not hasattr(mlp_model, 'loss_curve_'):
+        return
+        
+    loss_history = mlp_model.loss_curve_
+    iterations = range(1, len(loss_history) + 1)
     
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
-    
-    # Loss plot
-    ax1.plot(epochs, history['train_loss'], 'b-', lw=2, label='Training Loss')
-    ax1.plot(epochs, history['val_loss'], 'r--', lw=2, label='Validation Loss')
-    ax1.set_title('Cross-Entropy Loss vs. Epochs', fontsize=13, fontweight='bold')
-    ax1.set_xlabel('Epochs', fontsize=11)
-    ax1.set_ylabel('Loss', fontsize=11)
-    ax1.legend(loc='upper right', frameon=True)
-    ax1.grid(True, linestyle=':', alpha=0.6)
-    
-    # Accuracy / Metric plot
-    ax2.plot(epochs, history['train_acc'], 'b-', lw=2, label='Training Accuracy')
-    ax2.plot(epochs, history['val_acc'], 'r--', lw=2, label='Validation Accuracy')
-    ax2.set_title('Classification Accuracy vs. Epochs', fontsize=13, fontweight='bold')
-    ax2.set_xlabel('Epochs', fontsize=11)
-    ax2.set_ylabel('Accuracy', fontsize=11)
-    ax2.legend(loc='lower right', frameon=True)
-    ax2.grid(True, linestyle=':', alpha=0.6)
-    
+    plt.figure(figsize=(8, 5))
+    plt.plot(iterations, loss_history, 'b-', lw=2.2, label='Training Loss (Cross-Entropy)')
+    plt.title('Multilayer Perceptron (MLP) Loss Progression', fontsize=13, fontweight='bold')
+    plt.xlabel('Training Iterations (Epochs)', fontsize=11)
+    plt.ylabel('Loss Value', fontsize=11)
+    plt.legend(loc='upper right', frameon=True)
+    plt.grid(True, linestyle=':', alpha=0.6)
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches='tight')
     plt.close()

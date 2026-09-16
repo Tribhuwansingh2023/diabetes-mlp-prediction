@@ -1,37 +1,33 @@
 """
-Advanced Multilayer Perceptron (MLP) Clinical Diabetes Risk Intelligence Suite.
-Enterprise clinical decision-support system featuring live neural inference,
-biomarker deviation analytics, explainable risk drivers, neural architecture inspection,
-and multi-model research benchmarking.
+EndoPredict AI: Academic Multilayer Perceptron Diabetes Prediction Suite.
+Interactive academic demonstration tool featuring real-time neural inference,
+dynamic model metadata inspection, engineered feature vectors, and batch cohort simulation.
 """
 
 import os
 import sys
-import base64
+import json
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
 
-# Ensure src modules are resolvable by joblib unpickler
+# Ensure src modules are resolvable
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if os.path.join(BASE_DIR, "src") not in sys.path:
-    sys.path.insert(0, os.path.join(BASE_DIR, "src"))
+SRC_DIR = os.path.join(BASE_DIR, "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
 
-try:
-    from preprocessing import DiabetesPreprocessor
-except ImportError:
-    pass
+from prediction import predict_patient, load_artifacts, RAW_FEATURE_NAMES
 
-# Set Page Configuration
+# Page Configuration
 st.set_page_config(
-    page_title="EndoPredict AI | Clinical Diabetes MLP Suite",
+    page_title="EndoPredict AI | Diabetes MLP Academic Suite",
     page_icon="🩺",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom Design System & CSS
+# Custom Design System
 st.markdown("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -63,26 +59,24 @@ st.markdown("""
         gap: 12px;
     }
     .hero-subtitle {
-        font-size: 1.05rem;
+        font-size: 1.02rem;
         color: #94a3b8;
         font-weight: 400;
         max-width: 900px;
         line-height: 1.5;
     }
     
-    /* Glass Cards */
+    /* Cards */
     .glass-card {
         background: rgba(30, 41, 59, 0.4);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 16px;
-        padding: 24px;
+        padding: 22px;
         margin-bottom: 20px;
         box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
     }
     
-    /* Gauge and Stat Cards */
+    /* Stat Cards */
     .stat-card {
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -91,12 +85,12 @@ st.markdown("""
         text-align: center;
     }
     .stat-val {
-        font-size: 2rem;
+        font-size: 1.85rem;
         font-weight: 800;
         letter-spacing: -0.02em;
     }
     .stat-label {
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: #94a3b8;
@@ -113,17 +107,11 @@ st.markdown("""
         border-radius: 9999px;
         font-weight: 700;
         font-size: 1.05rem;
-        letter-spacing: -0.01em;
     }
     .badge-pill-low {
         background: rgba(16, 185, 129, 0.15);
         color: #34d399;
         border: 1px solid rgba(52, 211, 153, 0.4);
-    }
-    .badge-pill-mod {
-        background: rgba(245, 158, 11, 0.15);
-        color: #fbbf24;
-        border: 1px solid rgba(251, 191, 36, 0.4);
     }
     .badge-pill-high {
         background: rgba(239, 68, 68, 0.15);
@@ -131,95 +119,41 @@ st.markdown("""
         border: 1px solid rgba(248, 113, 113, 0.4);
     }
     
-    /* Risk driver progress bar */
+    /* Feature row */
     .driver-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         padding: 8px 12px;
         border-radius: 8px;
         background: rgba(255, 255, 255, 0.03);
     }
     .driver-name {
         font-weight: 600;
-        font-size: 0.95rem;
-        flex: 1;
+        font-size: 0.92rem;
     }
     .driver-status {
         font-weight: 700;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         padding: 3px 10px;
         border-radius: 6px;
-    }
-    
-    /* Architecture Diagram Node */
-    .arch-node {
-        background: rgba(14, 165, 233, 0.1);
-        border: 1px solid rgba(14, 165, 233, 0.3);
-        border-radius: 12px;
-        padding: 16px;
-        text-align: center;
-        color: #e0f2fe;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Path Constants
 VIZ_DIR = os.path.join(BASE_DIR, "visualizations")
-MODELS_DIR = os.path.join(BASE_DIR, "saved_models")
-MODEL_PATH = os.path.join(MODELS_DIR, "diabetes_model.pkl")
-PREPROCESSOR_PATH = os.path.join(MODELS_DIR, "eng_preprocessor.joblib")
-
-@st.cache_resource
-def load_artifacts():
-    if not os.path.exists(MODEL_PATH) or not os.path.exists(PREPROCESSOR_PATH):
-        return None, None
-    model = joblib.load(MODEL_PATH)
-    preprocessor = joblib.load(PREPROCESSOR_PATH)
-    return model, preprocessor
-
-def compute_engineered_features(data_dict):
-    """Generates all 19 feature columns required by the trained model pipeline."""
-    df = pd.DataFrame([data_dict])
-    
-    # 1. BMI Categories
-    df['BMI_Underweight'] = (df['BMI'] < 18.5).astype(int)
-    df['BMI_Normal'] = ((df['BMI'] >= 18.5) & (df['BMI'] < 25.0)).astype(int)
-    df['BMI_Overweight'] = ((df['BMI'] >= 25.0) & (df['BMI'] < 30.0)).astype(int)
-    df['BMI_Obese'] = (df['BMI'] >= 30.0).astype(int)
-    
-    # 2. Glucose Categories
-    df['Glucose_Normal'] = (df['Glucose'] < 100).astype(int)
-    df['Glucose_Prediabetes'] = ((df['Glucose'] >= 100) & (df['Glucose'] <= 125)).astype(int)
-    df['Glucose_Diabetes'] = (df['Glucose'] > 125).astype(int)
-    
-    # 3. Age Groups
-    df['Age_Young'] = (df['Age'] < 30).astype(int)
-    df['Age_Middle'] = ((df['Age'] >= 30) & (df['Age'] <= 50)).astype(int)
-    df['Age_Senior'] = (df['Age'] > 50).astype(int)
-    
-    # 4. Clinical Interactions
-    df['Insulin_Glucose_Ratio'] = df['Insulin'] / (df['Glucose'] + 1e-5)
-    df['Insulin_Resistance_Proxy'] = (df['Glucose'] * df['Insulin']) / 405.0
-    df['Pregnancy_Age_Risk'] = df['Pregnancies'] / (df['Age'] + 1e-5)
-    df['BMI_Age_Interaction'] = df['BMI'] * df['Age']
-    
-    # 5. Log Transformations
-    df['Log_Insulin'] = np.log1p(np.maximum(0, df['Insulin']))
-    df['Log_DPF'] = np.log1p(np.maximum(0, df['DiabetesPedigreeFunction']))
-    
-    return df
+RESULTS_DIR = os.path.join(BASE_DIR, "results")
 
 def generate_gauge_svg(prob_pct, risk_color):
     """Renders a modern, animated radial gauge SVG."""
-    stroke_offset = 283 - (283 * (prob_pct / 100))
+    stroke_dashoffset = 264 - (264 * (prob_pct / 100.0))
     return f"""
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
-        <svg width="180" height="180" viewBox="0 0 100 100">
+        <svg width="170" height="170" viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="42" stroke="rgba(255,255,255,0.1)" stroke-width="8" fill="none" />
             <circle cx="50" cy="50" r="42" stroke="{risk_color}" stroke-width="8" fill="none"
-                    stroke-dasharray="264" stroke-dashoffset="{264 - (264 * (prob_pct / 100))}"
+                    stroke-dasharray="264" stroke-dashoffset="{stroke_dashoffset}"
                     stroke-linecap="round" transform="rotate(-90 50 50)" style="transition: stroke-dashoffset 0.8s ease;" />
             <text x="50" y="47" font-size="19" font-weight="800" fill="#f8fafc" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif">{prob_pct:.1f}%</text>
             <text x="50" y="63" font-size="7" font-weight="600" fill="#94a3b8" text-anchor="middle" letter-spacing="1">PROBABILITY</text>
@@ -228,11 +162,11 @@ def generate_gauge_svg(prob_pct, risk_color):
     """
 
 def render_html_table(df):
-    """Pure HTML table generator that eliminates PyArrow DLL dependencies."""
+    """Pure HTML table generator eliminating PyArrow DLL dependencies."""
     table_rows = "".join([
         f"""<tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
-            <td style="padding: 10px 16px; font-weight: 600; color: #cbd5e1;">{col}</td>
-            <td style="padding: 10px 16px; font-family: 'Courier New', monospace; text-align: right; color: #38bdf8; font-weight: 700;">
+            <td style="padding: 9px 14px; font-weight: 600; color: #cbd5e1;">{col}</td>
+            <td style="padding: 9px 14px; font-family: monospace; text-align: right; color: #38bdf8; font-weight: 700;">
                 {f"{val:.4f}" if isinstance(val, (float, np.floating)) else str(val)}
             </td>
         </tr>"""
@@ -240,11 +174,11 @@ def render_html_table(df):
     ])
     return f"""
     <div style="border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; overflow: hidden; margin-top: 12px; background: rgba(15, 23, 42, 0.4);">
-        <table style="width: 100%; border-collapse: collapse; font-size: 0.92rem;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.90rem;">
             <thead>
                 <tr style="background: rgba(255, 255, 255, 0.06); border-bottom: 2px solid rgba(255, 255, 255, 0.12); text-align: left;">
-                    <th style="padding: 12px 16px; font-weight: 700; color: #f1f5f9;">Biomarker / Engineered Feature</th>
-                    <th style="padding: 12px 16px; text-align: right; font-weight: 700; color: #f1f5f9;">Computed Value</th>
+                    <th style="padding: 10px 14px; font-weight: 700; color: #f1f5f9;">Processed Feature Name</th>
+                    <th style="padding: 10px 14px; text-align: right; font-weight: 700; color: #f1f5f9;">Normalized Value</th>
                 </tr>
             </thead>
             <tbody>
@@ -255,261 +189,187 @@ def render_html_table(df):
     """
 
 def main():
-    # Hero Section
+    # Hero Header
     st.markdown("""
     <div class="hero-banner">
         <div class="hero-title">🩺 EndoPredict AI | Multilayer Perceptron Suite</div>
         <div class="hero-subtitle">
-            Next-generation clinical decision-support and metabolic risk stratification engine. Powered by deep feedforward neural networks (MLP) with Batch Normalization, Dropout regularization, and domain-engineered biometric interactions.
+            Academic Machine Learning demonstration for diabetes onset prediction using a tuned Scikit-Learn Multilayer Perceptron (MLP), structured data imputation, and domain-engineered feature interactions.
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    model, preprocessor = load_artifacts()
-    if model is None or preprocessor is None:
-        st.error("⚠️ Model artifacts missing. Please run `python src/train.py` first.")
+    try:
+        model, preprocessor, config = load_artifacts()
+    except Exception as e:
+        st.error(f"⚠️ Production artifacts missing or invalid: {e}. Please execute `python src/train.py`.")
         return
 
-    # Tabs Interface
+    # Multi-View Navigation Tabs
     tab1, tab2, tab3, tab4 = st.tabs([
-        "🩺 Live Clinical Risk Assessor",
-        "🧠 Neural Architecture & Dynamics",
+        "🩺 Live Patient Prediction",
+        "ℹ️ Model Architecture & Metadata",
         "📊 Benchmark & Research Analytics",
         "📁 Batch Cohort Simulator"
     ])
     
     # -------------------------------------------------------------------------------------------------
-    # TAB 1: LIVE RISK PREDICTION & CLINICAL REPORT
+    # TAB 1: LIVE PREDICTION
     # -------------------------------------------------------------------------------------------------
     with tab1:
-        st.sidebar.markdown("### 📋 Clinical Presets & Archetypes")
+        st.sidebar.markdown("### 📋 Patient Input Presets")
         preset = st.sidebar.selectbox(
-            "Select Patient Profile Archetype:",
+            "Load Sample Input Values:",
             [
-                "Custom Patient Input",
-                "Healthy Young Adult (Low Baseline)",
-                "Prediabetic Borderline (Impaired Glucose)",
-                "High-Risk Metabolic Patient (Hyperglycemic)",
-                "Gestational & Genetic Predisposition Risk"
+                "Custom Input",
+                "Demo — Lower Example",
+                "Demo — Borderline Example",
+                "Demo — Higher Example"
             ]
         )
         
-        # Configure preset parameter values
-        if preset == "Healthy Young Adult (Low Baseline)":
+        # Configure preset sample values
+        if preset == "Demo — Lower Example":
             defaults = dict(preg=0, gluc=82, bp=66, skin=18, ins=55, bmi=21.4, dpf=0.20, age=22)
-        elif preset == "Prediabetic Borderline (Impaired Glucose)":
-            defaults = dict(preg=2, gluc=116, bp=78, skin=27, ins=115, bmi=28.2, dpf=0.46, age=38)
-        elif preset == "High-Risk Metabolic Patient (Hyperglycemic)":
-            defaults = dict(preg=6, gluc=180, bp=92, skin=38, ins=290, bmi=38.4, dpf=1.12, age=55)
-        elif preset == "Gestational & Genetic Predisposition Risk":
-            defaults = dict(preg=5, gluc=132, bp=84, skin=32, ins=160, bmi=32.1, dpf=1.45, age=34)
+        elif preset == "Demo — Borderline Example":
+            defaults = dict(preg=2, gluc=118, bp=78, skin=26, ins=110, bmi=28.0, dpf=0.45, age=38)
+        elif preset == "Demo — Higher Example":
+            defaults = dict(preg=6, gluc=178, bp=90, skin=38, ins=280, bmi=37.5, dpf=1.10, age=54)
         else:
             defaults = dict(preg=1, gluc=110, bp=72, skin=24, ins=90, bmi=26.0, dpf=0.35, age=30)
             
         st.sidebar.markdown("---")
-        st.sidebar.info("💡 **Clinical Tip**: Adjust sliders below or load presets to evaluate neural network confidence and risk sensitivity in real time.")
+        st.sidebar.info("ℹ️ **Note**: Presets populate sample input values only. All predictions are generated dynamically by the trained MLPClassifier.")
         
-        # Clinical Parameter Inputs
         col_in1, col_in2 = st.columns(2)
         
         with col_in1:
-            st.markdown("#### 🩸 Glycemic & Metabolic Indicators")
-            glucose = st.slider("Plasma Glucose Concentration (mg/dL)", 40, 250, int(defaults['gluc']),
-                                help="Fasting plasma glucose (mg/dL). Reference: Normal < 100, Prediabetes 100-125, Diabetes >= 126")
-            insulin = st.slider("2-Hour Serum Insulin (μU/mL)", 10, 800, int(defaults['ins']),
-                                help="2-hour postprandial serum insulin. Normal fasting: 16-166 μU/mL")
-            dpf = st.slider("Diabetes Pedigree Function (Genetic Score)", 0.05, 2.50, float(defaults['dpf']), step=0.01,
-                            help="Genetic susceptibility function computed from family history pedigree.")
-            pregnancies = st.number_input("Pregnancy History (Count)", min_value=0, max_value=20, value=int(defaults['preg']))
+            st.markdown("#### 🩸 Glycemic & Metabolic Inputs")
+            glucose = st.slider("Glucose (mg/dL)", 0, 250, int(defaults['gluc']),
+                                help="Plasma glucose concentration (2-hour oral glucose tolerance test). Note: 0 values are imputed using training median.")
+            insulin = st.slider("Insulin (μU/mL)", 0, 800, int(defaults['ins']),
+                                help="2-Hour serum insulin (μU/mL). Note: 0 values are imputed using training median.")
+            dpf = st.slider("Diabetes Pedigree Function", 0.05, 2.50, float(defaults['dpf']), step=0.01,
+                            help="Genetic pedigree risk score computed from family diabetes history.")
+            pregnancies = st.number_input("Pregnancies (Count)", min_value=0, max_value=20, value=int(defaults['preg']))
             
         with col_in2:
-            st.markdown("#### 📏 Physiological & Anthropometric Indicators")
-            bmi = st.slider("Body Mass Index (BMI in kg/m²)", 10.0, 65.0, float(defaults['bmi']), step=0.1,
-                            help="BMI = Weight(kg) / Height(m)². Underweight <18.5, Normal 18.5-24.9, Overweight 25-29.9, Obese >=30")
-            blood_pressure = st.slider("Diastolic Blood Pressure (mm Hg)", 40, 140, int(defaults['bp']),
-                                       help="Diastolic BP (mm Hg). Normal <80, Elevated 80-89, Stage 2 HTN >=90")
-            skin_thickness = st.slider("Triceps Skinfold Thickness (mm)", 5, 99, int(defaults['skin']))
-            age = st.slider("Patient Age (Years)", 18, 100, int(defaults['age']))
+            st.markdown("#### 📏 Physiological Inputs")
+            bmi = st.slider("Body Mass Index (BMI in kg/m²)", 0.0, 65.0, float(defaults['bmi']), step=0.1,
+                            help="Body Mass Index = Weight(kg) / Height(m)². Note: 0 values are imputed using training median.")
+            blood_pressure = st.slider("Blood Pressure (mm Hg)", 0, 140, int(defaults['bp']),
+                                       help="Blood Pressure reading (mm Hg). Note: 0 values are imputed using training median.")
+            skin_thickness = st.slider("Skin Thickness (mm)", 0, 99, int(defaults['skin']),
+                                       help="Triceps skin fold thickness (mm). Note: 0 values are imputed using training median.")
+            age = st.slider("Age (Years)", 18, 100, int(defaults['age']))
             
         st.markdown("---")
-        btn_predict = st.button("⚡ Execute Multilayer Perceptron Inference", type="primary", use_container_width=True)
         
-        # Inference pipeline
+        # Execute Real Prediction Pipeline
         patient_dict = {
             'Pregnancies': pregnancies, 'Glucose': glucose, 'BloodPressure': blood_pressure,
             'SkinThickness': skin_thickness, 'Insulin': insulin, 'BMI': bmi,
             'DiabetesPedigreeFunction': dpf, 'Age': age
         }
-        df_feat = compute_engineered_features(patient_dict)
-        df_scaled = preprocessor.transform(df_feat)
-        prob = model.predict_proba(df_scaled)[0, 1]
-        pred = int(prob >= 0.5)
-        prob_pct = prob * 100
         
-        # Diagnostic Assessment Display
-        st.markdown("### 📊 Diagnostic Risk Intelligence Summary")
+        res = predict_patient(patient_dict, threshold=0.50)
+        prob = res['probability']
+        pred = res['predicted_class']
+        prob_pct = prob * 100.0
+        actual_dim = res['processed_feature_count']
         
+        # Display Prediction Outputs
+        st.markdown("### 📊 Model Prediction Summary")
         col_res1, col_res2, col_res3 = st.columns([1.2, 1.5, 1.3])
         
-        if prob < 0.35:
-            risk_color = "#10b981"
-            risk_label = "🟢 Low Clinical Risk"
-            badge_html = '<span class="badge-pill badge-pill-low">✅ Negative / Non-Diabetic</span>'
-            rec_text = "Patient biomarkers are within healthy metabolic baselines. Recommend routine annual checkups and healthy lifestyle maintenance."
-        elif prob <= 0.65:
-            risk_color = "#f59e0b"
-            risk_label = "🟡 Moderate / Prediabetic Risk"
-            badge_html = '<span class="badge-pill badge-pill-mod">⚠️ Borderline Prediabetes</span>'
-            rec_text = "Elevated glycemic or adiposity indicators detected. Order confirmatory Fasting Plasma Glucose (FPG) and HbA1c testing. Structured lifestyle intervention recommended."
-        else:
+        if pred == 1:
             risk_color = "#ef4444"
-            risk_label = "🔴 High Clinical Risk"
-            badge_html = '<span class="badge-pill badge-pill-high">🚨 High Risk / Diabetic</span>'
-            rec_text = "Significant hyperglycemia, insulin resistance proxy, and clinical risk factors present. Immediate specialist consultation, Oral Glucose Tolerance Test (OGTT), and metabolic panel advised."
+            badge_html = '<span class="badge-pill badge-pill-high">⚠️ Positive Prediction (Class 1)</span>'
+            summary_desc = "The model estimated a probability exceeding the classification threshold (0.50), indicating positive predicted status for diabetes onset."
+        else:
+            risk_color = "#10b981"
+            badge_html = '<span class="badge-pill badge-pill-low">✅ Negative Prediction (Class 0)</span>'
+            summary_desc = "The model estimated a probability below the classification threshold (0.50), indicating negative predicted status for diabetes onset."
 
         with col_res1:
             st.markdown('<div class="stat-card">', unsafe_allow_html=True)
             st.markdown(generate_gauge_svg(prob_pct, risk_color), unsafe_allow_html=True)
-            st.markdown(f'<div class="stat-label">Neural Probability: {prob_pct:.2f}%</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="stat-label">Model Probability: {prob_pct:.2f}%</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col_res2:
             st.markdown('<div class="glass-card" style="height: 100%;">', unsafe_allow_html=True)
-            st.markdown(f"**Diagnostic Classification:**<br>{badge_html}", unsafe_allow_html=True)
-            st.markdown(f"<br>**Risk Stratification Tier:**<br><span style='color: {risk_color}; font-size: 1.25rem; font-weight: 800;'>{risk_label}</span>", unsafe_allow_html=True)
-            st.markdown(f"<p style='color: #94a3b8; font-size: 0.9rem; margin-top: 10px; line-height: 1.4;'>{rec_text}</p>", unsafe_allow_html=True)
+            st.markdown(f"**Predicted Class:**<br>{badge_html}", unsafe_allow_html=True)
+            st.markdown(f"<br>**Decision Threshold:** `0.50` | **Raw Probability:** `{prob:.4f}`", unsafe_allow_html=True)
+            st.markdown(f"<p style='color: #94a3b8; font-size: 0.88rem; margin-top: 10px; line-height: 1.4;'>{summary_desc}</p>", unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col_res3:
             st.markdown('<div class="glass-card" style="height: 100%;">', unsafe_allow_html=True)
-            st.markdown("**🧪 Key Clinical Biomarkers**")
-            homa_proxy = (glucose * insulin) / 405.0
-            st.write(f"• **HOMA-IR Proxy:** `{homa_proxy:.2f}` " + ("(Elevated)" if homa_proxy > 2.5 else "(Normal)"))
-            st.write(f"• **Glucose Status:** `{glucose} mg/dL` " + ("(High)" if glucose >= 126 else ("(Borderline)" if glucose >= 100 else "(Optimal)")))
-            st.write(f"• **Adiposity Index:** `{bmi:.1f} kg/m²` " + ("(Obese)" if bmi >= 30 else ("(Overweight)" if bmi >= 25 else "(Normal)")))
-            st.write(f"• **Genetic Pedigree:** `{dpf:.2f}` " + ("(High)" if dpf > 0.8 else "(Moderate/Low)"))
+            st.markdown("**🔬 Model Input Summary**")
+            st.write(f"• **Raw Features:** `{res['raw_feature_count']}`")
+            st.write(f"• **Processed Features:** `{actual_dim}`")
+            st.write(f"• **Glucose Reading:** `{glucose} mg/dL`")
+            st.write(f"• **BMI Value:** `{bmi:.1f} kg/m²`")
+            st.write(f"• **Pedigree Function:** `{dpf:.2f}`")
             st.markdown('</div>', unsafe_allow_html=True)
             
-        # Clinical Risk Driver Decomposition
-        st.markdown("#### 🔬 Key Diagnostic Risk Drivers & Deviations")
-        c_drv1, c_drv2 = st.columns(2)
-        
-        with c_drv1:
-            # Glucose status bar
-            g_status = "Critical (>=126)" if glucose >= 126 else ("Elevated (100-125)" if glucose >= 100 else "Normal (<100)")
-            g_bg = "#ef4444" if glucose >= 126 else ("#f59e0b" if glucose >= 100 else "#10b981")
-            st.markdown(f"""
-            <div class="driver-row">
-                <span class="driver-name">🩸 Plasma Glucose ({glucose} mg/dL)</span>
-                <span class="driver-status" style="background: {g_bg}22; color: {g_bg}; border: 1px solid {g_bg}66;">{g_status}</span>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # BMI status bar
-            b_status = "Obese (>=30.0)" if bmi >= 30.0 else ("Overweight (25.0-29.9)" if bmi >= 25.0 else "Healthy (18.5-24.9)")
-            b_bg = "#ef4444" if bmi >= 30.0 else ("#f59e0b" if bmi >= 25.0 else "#10b981")
-            st.markdown(f"""
-            <div class="driver-row">
-                <span class="driver-name">⚖️ Body Mass Index ({bmi:.1f} kg/m²)</span>
-                <span class="driver-status" style="background: {b_bg}22; color: {b_bg}; border: 1px solid {b_bg}66;">{b_status}</span>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with c_drv2:
-            # Insulin Resistance status
-            i_status = "Severe Resistance (>4.0)" if homa_proxy > 4.0 else ("Moderate Resistance (>2.5)" if homa_proxy > 2.5 else "Optimal (<2.5)")
-            i_bg = "#ef4444" if homa_proxy > 4.0 else ("#f59e0b" if homa_proxy > 2.5 else "#10b981")
-            st.markdown(f"""
-            <div class="driver-row">
-                <span class="driver-name">⚡ Insulin Resistance Proxy ({homa_proxy:.2f})</span>
-                <span class="driver-status" style="background: {i_bg}22; color: {i_bg}; border: 1px solid {i_bg}66;">{i_status}</span>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Blood pressure status
-            bp_status = "Stage 2 HTN (>=90)" if blood_pressure >= 90 else ("Stage 1 HTN (80-89)" if blood_pressure >= 80 else "Normal (<80)")
-            bp_bg = "#ef4444" if blood_pressure >= 90 else ("#f59e0b" if blood_pressure >= 80 else "#10b981")
-            st.markdown(f"""
-            <div class="driver-row">
-                <span class="driver-name">💓 Diastolic Blood Pressure ({blood_pressure} mm Hg)</span>
-                <span class="driver-status" style="background: {bp_bg}22; color: {bp_bg}; border: 1px solid {bp_bg}66;">{bp_status}</span>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # Full Feature Vector Expander
-        with st.expander("🔍 Inspect Full 19-Dimensional Engineered Feature Vector"):
-            st.markdown(render_html_table(df_feat), unsafe_allow_html=True)
+        # Engineered Features Section
+        st.markdown(f"#### 🧬 Inspect Full {actual_dim}-Dimensional Processed Feature Vector")
+        with st.expander("Click to view transformed normalized feature vector"):
+            st.markdown(render_html_table(res['processed_features']), unsafe_allow_html=True)
 
     # -------------------------------------------------------------------------------------------------
-    # TAB 2: NEURAL ARCHITECTURE & MATHEMATICAL FORMULATION
+    # TAB 2: MODEL ARCHITECTURE & METADATA
     # -------------------------------------------------------------------------------------------------
     with tab2:
-        st.markdown("### 🧠 Deep Multilayer Perceptron Architecture")
-        st.markdown("""
-        The clinical prediction model is implemented as a specialized deep Feedforward Artificial Neural Network engineered with Batch Normalization and Dropout layers to prevent overfitting on tabular medical data.
-        """)
+        st.markdown("### ℹ️ Production Model Metadata & Architecture")
+        st.markdown("All parameters below are read dynamically from the serialized `model_config.json` artifact:")
         
-        # Architecture Visual Flow
-        st.markdown("""
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 20px 0;">
-            <div class="arch-node">
-                <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Input Layer</div>
-                <div style="font-size: 1.5rem; font-weight: 800; margin: 4px 0;">19 Features</div>
-                <div style="font-size: 0.85rem; color: #94a3b8;">Standardized Biometrics & Interactions</div>
-            </div>
-            <div class="arch-node">
-                <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Hidden Layer 1</div>
-                <div style="font-size: 1.5rem; font-weight: 800; margin: 4px 0;">64 Neurons</div>
-                <div style="font-size: 0.85rem; color: #94a3b8;">BatchNorm + ReLU + Dropout (0.2)</div>
-            </div>
-            <div class="arch-node">
-                <div style="font-size: 0.8rem; color: #38bdf8; font-weight: 700; text-transform: uppercase;">Hidden Layer 2</div>
-                <div style="font-size: 1.5rem; font-weight: 800; margin: 4px 0;">32 Neurons</div>
-                <div style="font-size: 0.85rem; color: #94a3b8;">BatchNorm + ReLU + Dropout (0.2)</div>
-            </div>
-            <div class="arch-node" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3);">
-                <div style="font-size: 0.8rem; color: #34d399; font-weight: 700; text-transform: uppercase;">Output Layer</div>
-                <div style="font-size: 1.5rem; font-weight: 800; margin: 4px 0; color: #34d399;">1 Neuron</div>
-                <div style="font-size: 0.85rem; color: #94a3b8;">Sigmoid Probability P(Diabetic)</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Mathematical Formulation
-        st.markdown("#### 📐 Mathematical Foundations")
-        col_math1, col_math2 = st.columns(2)
-        with col_math1:
-            st.markdown(r"""
-            **1. Forward Propagation:**
-            $$\mathbf{z}^{(1)} = \mathbf{W}^{(1)}\mathbf{x} + \mathbf{b}^{(1)}$$
-            $$\mathbf{h}^{(1)} = \text{ReLU}\left(\text{BatchNorm}(\mathbf{z}^{(1)})\right)$$
-            $$\mathbf{z}^{(2)} = \mathbf{W}^{(2)}\mathbf{h}^{(1)} + \mathbf{b}^{(2)}$$
-            $$\hat{y} = \sigma\left(\mathbf{W}^{(3)}\mathbf{h}^{(2)} + b^{(3)}\right) = \frac{1}{1 + e^{-z^{(3)}}}$$
-            """)
-        with col_math2:
-            st.markdown(r"""
-            **2. Binary Cross-Entropy Loss & Regularization:**
-            $$\mathcal{L}(\theta) = -\frac{1}{N}\sum_{i=1}^N \left[ y_i \log(\hat{y}_i) + (1-y_i)\log(1-\hat{y}_i) \right] + \lambda \|\mathbf{W}\|_2^2$$
-            **3. Optimization:**
-            - **Algorithm:** Adam Optimizer ($\beta_1=0.9, \beta_2=0.999$)
-            - **Learning Rate:** $\eta = 0.001$ with weight decay $L_2 = 10^{-4}$
-            """)
+        c_m1, c_m2, c_m3 = st.columns(3)
+        with c_m1:
+            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
+            st.markdown(f'<div class="stat-val" style="color: #38bdf8;">{config.get("framework", "scikit-learn").upper()}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="stat-label">Framework: {config.get("model_type", "MLPClassifier")}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        with c_m2:
+            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
+            st.markdown(f'<div class="stat-val" style="color: #34d399;">{config.get("processed_feature_count", actual_dim)}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="stat-label">Processed Input Dimensions</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        with c_m3:
+            st.markdown('<div class="stat-card">', unsafe_allow_html=True)
+            st.markdown(f'<div class="stat-val" style="color: #fbbf24;">{tuple(config.get("hidden_layer_sizes", [64, 32]))}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="stat-label">Hidden Layer Architecture</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             
-        # Embedded Learning Curve Plot
+        st.markdown("#### ⚙️ Hyperparameter Configuration")
+        c_p1, c_p2 = st.columns(2)
+        with c_p1:
+            st.write(f"• **Activation Function:** `{config.get('activation', 'relu')}`")
+            st.write(f"• **Optimizer (Solver):** `{config.get('solver', 'adam')}`")
+            st.write(f"• **Initial Learning Rate:** `{config.get('learning_rate_init', 0.001)}`")
+            st.write(f"• **Batch Size:** `{config.get('batch_size', 32)}`")
+        with c_p2:
+            st.write(f"• **L2 Regularization (Alpha):** `{config.get('alpha', 0.001)}`")
+            st.write(f"• **Maximum Iterations:** `{config.get('max_iter', 400)}`")
+            st.write(f"• **Classification Threshold:** `{config.get('threshold', 0.50)}`")
+            st.write(f"• **Training Dataset Size:** `{config.get('train_samples', 536)} + {config.get('val_samples', 116)} (Train+Val)`")
+
+        # Loss Curve Visualizer
         lc_path = os.path.join(VIZ_DIR, "mlp_learning_curves.png")
         if os.path.exists(lc_path):
-            st.markdown("#### 📉 Neural Training & Validation Learning Curves")
-            st.image(lc_path, use_container_width=True, caption="Figure: Binary Cross-Entropy Loss and Accuracy progression across training epochs.")
+            st.markdown("#### 📉 Scikit-Learn MLP Training Loss Progression")
+            st.image(lc_path, caption="Figure: Cross-Entropy Loss curve during model training iterations.", use_container_width=True)
 
     # -------------------------------------------------------------------------------------------------
     # TAB 3: BENCHMARK & RESEARCH ANALYTICS
     # -------------------------------------------------------------------------------------------------
     with tab3:
-        st.markdown("### 📊 Comprehensive Model Benchmarks on Unseen Test Cohort")
-        comp_csv = os.path.join(VIZ_DIR, "model_comparison_results.csv")
+        st.markdown("### 📊 Comprehensive Model Benchmarks (Untouched Test Set, N=116)")
+        comp_csv = os.path.join(RESULTS_DIR, "model_comparison.csv")
         if os.path.exists(comp_csv):
             df_comp = pd.read_csv(comp_csv)
-            # Render benchmark table cleanly with HTML
             comp_rows = "".join([
                 f"""<tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: {'rgba(56, 189, 248, 0.1)' if 'Multilayer' in str(r['Model']) else 'transparent'};">
                     <td style="padding: 10px 14px; font-weight: 700; color: {'#38bdf8' if 'Multilayer' in str(r['Model']) else '#f1f5f9'};">{r['Model']}</td>
@@ -527,7 +387,7 @@ def main():
             
             st.markdown(f"""
             <div style="border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; overflow: hidden; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.90rem;">
                     <thead>
                         <tr style="background: rgba(255, 255, 255, 0.08); border-bottom: 2px solid rgba(255, 255, 255, 0.15); text-align: center;">
                             <th style="padding: 12px 14px; text-align: left;">Algorithm</th>
@@ -548,7 +408,6 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             
-        # Clinical Visual Analytics Gallery
         col_v1, col_v2 = st.columns(2)
         roc_path = os.path.join(VIZ_DIR, "roc_curves.png")
         cm_path = os.path.join(VIZ_DIR, "confusion_matrices.png")
@@ -557,25 +416,25 @@ def main():
         
         with col_v1:
             if os.path.exists(roc_path):
-                st.image(roc_path, use_container_width=True, caption="Multi-Model ROC Curves")
+                st.image(roc_path, caption="Receiver Operating Characteristic (ROC) Comparison", use_container_width=True)
             if os.path.exists(pr_path):
-                st.image(pr_path, use_container_width=True, caption="Precision-Recall Curves")
+                st.image(pr_path, caption="Precision-Recall Curves for Imbalanced Assessment", use_container_width=True)
         with col_v2:
             if os.path.exists(cm_path):
-                st.image(cm_path, use_container_width=True, caption="Confusion Matrix Grid")
+                st.image(cm_path, caption="Confusion Matrix Grid", use_container_width=True)
             if os.path.exists(corr_path):
-                st.image(corr_path, use_container_width=True, caption="Feature Correlation Heatmap")
+                st.image(corr_path, caption="Dataset Feature Correlation Matrix", use_container_width=True)
 
     # -------------------------------------------------------------------------------------------------
-    # TAB 4: BATCH PATIENT COHORT SCREENING SIMULATOR
+    # TAB 4: BATCH COHORT SIMULATOR
     # -------------------------------------------------------------------------------------------------
     with tab4:
-        st.markdown("### 📁 Batch Patient Screening Simulator")
-        st.markdown("Evaluate synthetic clinical cohorts simultaneously to assess population-level risk distributions.")
+        st.markdown("### 📁 Batch Cohort Simulator")
+        st.markdown("Simulate and screen multiple patient samples simultaneously.")
         
-        num_sim = st.slider("Simulate Cohort Size (Patients):", 5, 50, 10)
+        num_sim = st.slider("Cohort Sample Count:", 5, 50, 10)
         
-        if st.button("🎲 Generate & Screen Simulated Patient Cohort", type="primary"):
+        if st.button("🎲 Run Cohort Screening Simulation", type="primary"):
             np.random.seed(int(num_sim))
             sim_records = []
             for i in range(num_sim):
@@ -596,31 +455,21 @@ def main():
                 p['BMI'] = max(16.0, min(55.0, p['BMI']))
                 p['DiabetesPedigreeFunction'] = max(0.08, min(2.4, p['DiabetesPedigreeFunction']))
                 
-                feat_df = compute_engineered_features(p)
-                scaled_df = preprocessor.transform(feat_df)
-                p_prob = model.predict_proba(scaled_df)[0, 1]
-                
-                p['Predicted_Risk'] = f"{p_prob * 100:.1f}%"
-                p['Risk_Tier'] = "High Risk (Diabetic)" if p_prob >= 0.65 else ("Borderline Risk" if p_prob >= 0.35 else "Low Risk (Healthy)")
+                res_p = predict_patient(p)
+                p['Estimated_Probability'] = f"{res_p['probability'] * 100:.1f}%"
+                p['Predicted_Class'] = "Positive (1)" if res_p['predicted_class'] == 1 else "Negative (0)"
                 sim_records.append(p)
                 
             sim_df = pd.DataFrame(sim_records)
+            pos_count = (sim_df['Predicted_Class'] == "Positive (1)").sum()
+            neg_count = (sim_df['Predicted_Class'] == "Negative (0)").sum()
             
-            # Summary Metrics
-            c_s1, c_s2, c_s3 = st.columns(3)
-            high_count = (sim_df['Risk_Tier'] == "High Risk (Diabetic)").sum()
-            mod_count = (sim_df['Risk_Tier'] == "Borderline Risk").sum()
-            low_count = (sim_df['Risk_Tier'] == "Low Risk (Healthy)").sum()
-            
+            c_s1, c_s2 = st.columns(2)
             with c_s1:
-                st.markdown(f'<div class="stat-card"><div class="stat-val" style="color: #f87171;">{high_count}</div><div class="stat-label">High Risk Cases</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="stat-card"><div class="stat-val" style="color: #f87171;">{pos_count}</div><div class="stat-label">Positive Class Predictions</div></div>', unsafe_allow_html=True)
             with c_s2:
-                st.markdown(f'<div class="stat-card"><div class="stat-val" style="color: #fbbf24;">{mod_count}</div><div class="stat-label">Borderline Cases</div></div>', unsafe_allow_html=True)
-            with c_s3:
-                st.markdown(f'<div class="stat-card"><div class="stat-val" style="color: #34d399;">{low_count}</div><div class="stat-label">Low Risk Baselines</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="stat-card"><div class="stat-val" style="color: #34d399;">{neg_count}</div><div class="stat-label">Negative Class Predictions</div></div>', unsafe_allow_html=True)
                 
-            st.markdown("#### 📋 Cohort Screening Register")
-            # Render HTML table of cohort
             cohort_rows = "".join([
                 f"""<tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
                     <td style="padding: 8px 12px; font-weight: 700; color: #38bdf8;">{r['Patient_ID']}</td>
@@ -628,8 +477,8 @@ def main():
                     <td style="padding: 8px 12px; text-align: center;">{r['Glucose']} mg/dL</td>
                     <td style="padding: 8px 12px; text-align: center;">{r['BMI']}</td>
                     <td style="padding: 8px 12px; text-align: center;">{r['Insulin']} μU/mL</td>
-                    <td style="padding: 8px 12px; text-align: center; font-weight: 700;">{r['Predicted_Risk']}</td>
-                    <td style="padding: 8px 12px; font-weight: 700; color: {'#f87171' if 'High' in r['Risk_Tier'] else ('#fbbf24' if 'Borderline' in r['Risk_Tier'] else '#34d399')};">{r['Risk_Tier']}</td>
+                    <td style="padding: 8px 12px; text-align: center; font-weight: 700;">{r['Estimated_Probability']}</td>
+                    <td style="padding: 8px 12px; font-weight: 700; color: {'#f87171' if 'Positive' in r['Predicted_Class'] else '#34d399'};">{r['Predicted_Class']}</td>
                 </tr>"""
                 for _, r in sim_df.iterrows()
             ])
@@ -644,8 +493,8 @@ def main():
                             <th style="padding: 10px 12px;">Glucose</th>
                             <th style="padding: 10px 12px;">BMI</th>
                             <th style="padding: 10px 12px;">Insulin</th>
-                            <th style="padding: 10px 12px;">Predicted Risk</th>
-                            <th style="padding: 10px 12px; text-align: left;">Clinical Stratification</th>
+                            <th style="padding: 10px 12px;">Probability</th>
+                            <th style="padding: 10px 12px; text-align: left;">Predicted Class</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -655,9 +504,9 @@ def main():
             </div>
             """, unsafe_allow_html=True)
 
-    # Footer
+    # Academic & Medical Disclaimer Footer
     st.markdown("---")
-    st.caption("🔒 **EndoPredict AI Clinical Decision System** • Built with PyTorch, Scikit-Learn, and Streamlit • Developed for Lab Assignment 01 (Multilayer Perceptron for Diabetes Prediction). Strictly for research & academic evaluation.")
+    st.caption("ℹ️ **Academic & Medical Disclaimer**: This application is an academic machine-learning demonstration developed for Lab Assignment 01 (Predicting Diabetes with Multilayer Perceptron). It is not intended to provide standalone medical diagnosis, medical advice, or treatment plans.")
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,7 @@
 """
 Models Module for Diabetes Classification.
-Defines Conventional ML Baseline Classifiers and Multilayer Perceptron (MLP) architectures.
+Defines Conventional Machine Learning Baseline Classifiers and the
+authoritative Multilayer Perceptron (MLP) architecture using Scikit-Learn.
 """
 
 from sklearn.linear_model import LogisticRegression
@@ -9,13 +10,10 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neural_network import MLPClassifier
-import torch
-import torch.nn as nn
-import torch.optim as optim
 
 def get_baseline_models(random_state=42):
     """
-    Returns dictionary of baseline machine learning classifiers.
+    Returns a dictionary of baseline machine learning classifiers.
     """
     models = {
         'Logistic Regression': LogisticRegression(
@@ -50,30 +48,21 @@ def get_baseline_models(random_state=42):
     }
     return models
 
-class PyTorchMLP(nn.Module):
+def build_mlp_classifier(hidden_layer_sizes=(64, 32), activation='relu',
+                         learning_rate_init=0.001, alpha=0.001,
+                         batch_size=32, max_iter=500, early_stopping=False,
+                         random_state=42):
     """
-    PyTorch implementation of Multilayer Perceptron for Diabetes Prediction.
-    Architecture:
-      Input (D) -> Dense(hidden1) -> BatchNorm -> ReLU -> Dropout(p)
-               -> Dense(hidden2) -> BatchNorm -> ReLU -> Dropout(p)
-               -> Dense(1) -> Sigmoid -> Prediction
+    Factory function to construct a configured Scikit-Learn MLPClassifier.
     """
-    def __init__(self, input_dim, hidden1=64, hidden2=32, dropout_rate=0.2):
-        super(PyTorchMLP, self).__init__()
-        self.network = nn.Sequential(
-            nn.Linear(input_dim, hidden1),
-            nn.BatchNorm1d(hidden1),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            
-            nn.Linear(hidden1, hidden2),
-            nn.BatchNorm1d(hidden2),
-            nn.ReLU(),
-            nn.Dropout(dropout_rate),
-            
-            nn.Linear(hidden2, 1),
-            nn.Sigmoid()
-        )
-        
-    def forward(self, x):
-        return self.network(x)
+    return MLPClassifier(
+        hidden_layer_sizes=hidden_layer_sizes,
+        activation=activation,
+        solver='adam',
+        alpha=alpha,
+        batch_size=batch_size,
+        learning_rate_init=learning_rate_init,
+        max_iter=max_iter,
+        early_stopping=early_stopping,
+        random_state=random_state
+    )
